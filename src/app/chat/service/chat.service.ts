@@ -1,31 +1,38 @@
 import { Injectable, OnInit } from '@angular/core';
-import { webSocket } from 'rxjs/webSocket';
 import { Observable } from 'rxjs';
-import { Message } from '../message';
-
 @Injectable({
   providedIn: 'root'
 })
-export class ChatService implements OnInit {
-  private messages: Message[]
-  constructor() {}
+export class ChatService {
 
-  ngOnInit(): void {}
+    ws: WebSocket;
+    socketIsOpen = 1;
 
-  getMessages(): Message[]{
-    let ws = webSocket('ws://localhost:8080/chat');
-    ws.subscribe(
-      (msg) => console.log('message received: ' + msg),
-      (err) => console.log(err),
-      () => console.log('complete')
-    );
-    ws.next( JSON.stringify(
-      {
-        id:0,
-        sender: "",
-        recipient: "",
-        timeStamp: new Date(),
-        message: msg
-      }));
+    createObservableSocket(url: string): Observable<any> {
+       this.ws = new WebSocket(url);
+
+      return new Observable(
+         observer => {
+
+          this.ws.onmessage = (event) =>
+            observer.next(event.data);
+
+          this.ws.onerror = (event) => observer.error(event);
+
+          this.ws.onclose = (event) => observer.complete();
+
+          return () =>
+              this.ws.close(1000, "The user disconnected");
+         }
+      );
     }
-}
+
+    sendMessage(message: string): string {
+      if (this.ws.readyState === this.socketIsOpen) {
+         this.ws.send(message);
+         return `Sent to server ${message}`;
+      } else {
+        return 'Message was not sent - the socket is closed';
+       }
+    }
+  }
